@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cupcake Quest</title>
+    <style>
+        canvas { border: 1px solid black; background: #ffe6f0; touch-action: none; }
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="320" height="480"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) console.error('Canvas context failed!');
+
+        let player = { x: 160, y: 400, width: 20, height: 40, speed: 3, stomachSize: 1, bodySize: 1 };
+        let cupcakes = [];
+        let score = 0;
+        let gameOver = false;
+        let labradoodle = { x: -50, y: 420, width: 40, height: 30, speed: 1.5, targetCupcake: null, tailAngle: 0 };
+
+        function spawnCupcake() {
+            let x = Math.random() * (canvas.width - 20);
+            cupcakes.push({ x: x, y: 0, width: 20, height: 20 });
+            console.log('Cupcake spawned at:', x);
+        }
+
+        function drawPlayer() {
+            let px = player.x, py = player.y, pw = player.width * player.bodySize, ph = player.height * player.bodySize;
+
+            // Legs with shoes
+            ctx.fillStyle = '#ffe4c4';
+            ctx.beginPath();
+            ctx.arc(px + 5, py + ph - 5, 4, 0, Math.PI * 2);
+            ctx.arc(px + pw - 5, py + ph - 5, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+            ctx.fillStyle = '#ff6666';
+            ctx.fillRect(px + 2, py + ph - 3, 6, 3);
+            ctx.fillRect(px + pw - 8, py + ph - 3, 6, 3);
+
+            // Dress with ruffles
+            let dressGradient = ctx.createLinearGradient(px, py, px, py + ph);
+            dressGradient.addColorStop(0, '#ff9999');
+            dressGradient.addColorStop(1, '#ff6666');
+            ctx.fillStyle = dressGradient;
+            ctx.beginPath();
+            ctx.moveTo(px, py + 10);
+            ctx.lineTo(px + pw / 2, py);
+            ctx.lineTo(px + pw, py + 10);
+            ctx.lineTo(px + pw + 5, py + ph - 5);
+            ctx.lineTo(px - 5, py + ph - 5);
+            ctx.fill();
+            ctx.closePath();
+            ctx.fillStyle = '#ffcccc';
+            ctx.beginPath();
+            ctx.arc(px + pw / 2, py + ph - 5, 5, 0, Math.PI); // Ruffle
+            ctx.fill();
+            ctx.closePath();
+
+            // Stomach (grows)
+            let stomachGradient = ctx.createRadialGradient(px + pw / 2, py + ph / 2, 5, px + pw / 2, py + ph / 2, 10 * player.stomachSize);
+            stomachGradient.addColorStop(0, '#ffcccc');
+            stomachGradient.addColorStop(1, '#ff9999');
+            ctx.fillStyle = stomachGradient;
+            ctx.beginPath();
+            ctx.arc(px + pw / 2, py + ph / 2, 10 * player.stomachSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+
+            // Arms with hands
+            ctx.fillStyle = '#ffe4c4';
+            ctx.beginPath();
+            ctx.moveTo(px - 5, py + 10);
+            ctx.lineTo(px - 10, py + 20);
+            ctx.lineTo(px - 5, py + 25);
+            ctx.lineTo(px, py + 15);
+            ctx.fill();
+            ctx.closePath();
+            ctx.beginPath();
+            ctx.moveTo(px + pw, py + 15);
+            ctx.lineTo(px + pw + 5, py + 25);
+            ctx.lineTo(px + pw + 10, py + 20);
+            ctx.lineTo(px + pw + 5, py + 10);
+            ctx.fill();
+            ctx.closePath();
+
+            // Head with details
+            ctx.fillStyle = '#ffe4c4';
+            ctx.beginPath();
+            ctx.arc(px + pw / 2, py - 5, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+            ctx.fillStyle = '#ff9999';
+            ctx.beginPath();
+            ctx.arc(px + pw / 2 - 3, py - 5, 2, 0, Math.PI * 2);
+            ctx.arc(px + pw / 2 + 3, py - 5, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(px + pw / 2 - 3, py - 8, 1, 0, Math.PI * 2);
+            ctx.arc(px + pw / 2 + 3, py - 8, 1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+
+            // Hair with strands
+            ctx.fillStyle = '#d2b48c';
+            ctx.beginPath();
+            ctx.moveTo(px - 5, py - 15);
+            ctx.quadraticCurveTo(px + pw / 2, py - 20, px + pw + 5, py - 15);
+            ctx.lineTo(px + pw + 10, py + 5);
+            ctx.lineTo(px - 10, py + 5);
+            ctx.fill();
+            ctx.closePath();
+            ctx.fillStyle = '#b89b72';
+            ctx.fillRect(px + 2, py - 15, pw - 4, 2);
+        }
+
+        function drawCupcakes() {
+            cupcakes.forEach(c => {
+                // Frosting
+                let frostingGradient = ctx.createRadialGradient(c.x + c.width / 2, c.y + c.height / 2 - 5, 2, c.x + c.width / 2, c.y + c.height / 2 - 5, c.width / 2);
+                frostingGradient.addColorStop(0, '#ff69b4');
+                frostingGradient.addColorStop(1, '#ff1493');
+                ctx.fillStyle = frostingGradient;
+                ctx.beginPath();
+                ctx.arc(c.x + c.width / 2, c.y + c.height / 2 - 5, c.width / 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#ff1493';
+                ctx.beginPath();
+                ctx.arc(c.x + c.width / 2, c.y + c.height / 2 - 5, c.width / 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                // Base
+                ctx.fillStyle = '#f4a460';
+                ctx.beginPath();
+                ctx.moveTo(c.x, c.y + c.height / 2);
+                ctx.lineTo(c.x + c.width, c.y + c.height / 2);
+                ctx.lineTo(c.x + c.width - 2, c.y + c.height);
+                ctx.lineTo(c.x + 2, c.y + c.height);
+                ctx.fill();
+                ctx.closePath();
+                // Sprinkles
+                ctx.fillStyle = 'white';
+                ctx.fillRect(c.x + 3, c.y + 1, 2, 2);
+                ctx.fillRect(c.x + 15, c.y + 3, 2, 2);
+                ctx.fillRect(c.x + 8, c.y + 6, 2, 2);
+
+                if (!gameOver) c.y += 2;
+                let stomachX = player.x + player.width / 2;
+                let stomachY = player.y + player.height / 2;
+                let stomachRadius = 10 * player.stomachSize;
+                if (c.y + c.height > stomachY - stomachRadius && c.y < stomachY + stomachRadius &&
+                    c.x + c.width > stomachX - stomachRadius && c.x < stomachX + stomachRadius) {
+                    score += 10;
+                    player.stomachSize += 0.2;
+                    cupcakes = cupcakes.filter(cake => cake !== c);
+                    console.log('Player ate cupcake! Score:', score);
+                }
+            });
+        }
+
+        function drawLabradoodle() {
+            if (score < 250) return;
+            gameOver = true;
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText('Matthew, I don\'t feel good :(', 20, 240);
+
+            if (cupcakes.length > 0) {
+                if (!labradoodle.targetCupcake || !cupcakes.includes(labradoodle.targetCupcake)) {
+                    labradoodle.targetCupcake = cupcakes[0];
+                    console.log('Targeting cupcake at:', labradoodle.targetCupcake.x, labradoodle.targetCupcake.y);
+                }
+                let tx = labradoodle.targetCupcake.x + labradoodle.targetCupcake.width / 2;
+                let ty = labradoodle.targetCupcake.y + labradoodle.targetCupcake.height / 2;
+                let dx = tx - (labradoodle.x + labradoodle.width / 2);
+                let dy = ty - (labradoodle.y + labradoodle.height / 2);
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > labradoodle.speed) {
+                    labradoodle.x += (dx / dist) * labradoodle.speed;
+                    labradoodle.y += (dy / dist) * labradoodle.speed;
+                }
+                if (dist < 20) {
+                    cupcakes = cupcakes.filter(c => c !== labradoodle.targetCupcake);
+                    labradoodle.targetCupcake = null;
+                    console.log('Labradoodle ate cupcake! Remaining:', cupcakes.length);
+                }
+            } else if (labradoodle.x < canvas.width) {
+                labradoodle.x += labradoodle.speed;
+            }
+
+            // Enhanced Labradoodle graphics
+            let lx = labradoodle.x, ly = labradoodle.y;
+            // Body
+            let bodyGradient = ctx.createLinearGradient(lx, ly, lx + labradoodle.width, ly + labradoodle.height);
+            bodyGradient.addColorStop(0, '#f5e0bc');
+            bodyGradient.addColorStop(1, '#e6d2a8');
+            ctx.fillStyle = bodyGradient;
+            ctx.beginPath();
+            ctx.ellipse(lx + labradoodle.width / 2, ly + labradoodle.height / 2, labradoodle.width / 2, labradoodle.height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+            // Legs
+            ctx.fillStyle = '#f5e0bc';
+            ctx.beginPath();
+            ctx.arc(lx + 10, ly + labradoodle.height + 5, 5, 0, Math.PI * 2);
+            ctx.arc(lx + labradoodle.width - 10, ly + labradoodle.height + 5, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+            // Head
+            ctx.beginPath();
+            ctx.arc(lx + labradoodle.width, ly + 10, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+            // Ears
+            ctx.fillStyle = '#d9c49e';
+            ctx.beginPath();
+            ctx.moveTo(lx + labradoodle.width - 5, ly + 5);
+            ctx.quadraticCurveTo(lx + labradoodle.width + 10, ly - 5, lx + labradoodle.width + 15, ly + 15);
+            ctx.lineTo(lx + labradoodle.width + 5, ly + 15);
+            ctx.fill();
+            ctx.closePath();
+            // Tail (wagging)
+            labradoodle.tailAngle += 0.1;
+            ctx.save();
+            ctx.translate(lx, ly + labradoodle.height / 2);
+            ctx.rotate(Math.sin(labradoodle.tailAngle) * 0.3);
+            ctx.fillStyle = '#f5e0bc';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-15, -5);
+            ctx.lineTo(-15, 5);
+            ctx.fill();
+            ctx.closePath();
+            ctx.restore();
+            // Eyes and nose
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(lx + labradoodle.width - 2, ly + 8, 2, 0, Math.PI * 2);
+            ctx.arc(lx + labradoodle.width + 2, ly + 12, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawCupcakes();
+            drawLabradoodle();
+            ctx.fillStyle = 'black';
+            ctx.font = '16px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 20);
+        }
+
+        function update() {
+            if (!gameOver || score >= 250) {
+                draw();
+                if (!gameOver && Math.random() < 0.05) spawnCupcake();
+                cupcakes = cupcakes.filter(c => c.y < canvas.height);
+                requestAnimationFrame(update);
+            }
+        }
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            let touch = e.touches[0];
+            let touchX = touch.clientX - canvas.offsetLeft;
+            player.x = Math.max(0, Math.min(canvas.width - player.width, touchX - player.width / 2));
+            console.log('Player moved to:', player.x);
+        });
+
+        console.log('Game starting...');
+        update();
+    </script>
+</body>
+</html>
