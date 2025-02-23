@@ -2,17 +2,39 @@
 <html>
 <head>
     <title>Cupcake Quest</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        canvas { border: 1px solid black; background: #ffe6f0; touch-action: none; }
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        canvas { 
+            border: 1px solid black; 
+            background: #ffe6f0; 
+            touch-action: none;
+            /* Scale to fit screen while maintaining aspect ratio */
+            width: 100vw;
+            height: 150vw; /* 480/320 * 100 = 150 to maintain 3:2 aspect ratio */
+            max-width: 480px;
+            max-height: 720px;
+            object-fit: contain;
+        }
+        body { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="320" height="480"></canvas>
+    <canvas id="gameCanvas"></canvas>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) console.error('Canvas context failed!');
+
+        // Set canvas logical size (game resolution) to 320x480, but scale physically
+        canvas.width = 320;
+        canvas.height = 480;
 
         let player = { x: 160, y: 400, width: 20, height: 40, speed: 3, stomachSize: 1, bodySize: 1 };
         let cupcakes = [];
