@@ -8,7 +8,6 @@
             border: 1px solid black; 
             background: #ffe6f0; 
             touch-action: none;
-            /* Scale to fit screen while maintaining aspect ratio */
             width: 100vw;
             height: 150vw; /* 480/320 * 100 = 150 to maintain 3:2 aspect ratio */
             max-width: 480px;
@@ -36,11 +35,12 @@
         canvas.width = 320;
         canvas.height = 480;
 
-        let player = { x: 160, y: 400, width: 20, height: 40, speed: 3, stomachSize: 1, bodySize: 1 };
+        let player = { x: 160, y: 400, width: 20, height: 40, speed: 3, stomachSize: 1, bodySize: 1, rolling: false, rollX: 0, rollY: 400, rollVel: 0 };
         let cupcakes = [];
         let score = 0;
         let gameOver = false;
-        let labradoodle = { x: -50, y: 420, width: 40, height: 30, speed: 1.5, targetCupcake: null, tailAngle: 0 };
+        let labradoodle = { x: -50, y: 420, width: 40, height: 30, speed: 1.5, targetCupcake: null, tailAngle: 0, pooping: false, poopFrame: 0, exited: false };
+        let burpFrame = 0;
 
         function spawnCupcake() {
             let x = Math.random() * (canvas.width - 20);
@@ -49,95 +49,158 @@
         }
 
         function drawPlayer() {
-            let px = player.x, py = player.y, pw = player.width * player.bodySize, ph = player.height * player.bodySize;
+            let px, py, pw, ph;
+            if (!player.rolling) {
+                px = player.x;
+                py = player.y;
+                pw = player.width * player.bodySize;
+                ph = player.height * player.bodySize;
 
-            // Legs with shoes
-            ctx.fillStyle = '#ffe4c4';
-            ctx.beginPath();
-            ctx.arc(px + 5, py + ph - 5, 4, 0, Math.PI * 2);
-            ctx.arc(px + pw - 5, py + ph - 5, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.closePath();
-            ctx.fillStyle = '#ff6666';
-            ctx.fillRect(px + 2, py + ph - 3, 6, 3);
-            ctx.fillRect(px + pw - 8, py + ph - 3, 6, 3);
+                // Legs with shoes
+                ctx.fillStyle = '#ffe4c4';
+                ctx.beginPath();
+                ctx.arc(px + 5, py + ph - 5, 4, 0, Math.PI * 2);
+                ctx.arc(px + pw - 5, py + ph - 5, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#ff6666';
+                ctx.fillRect(px + 2, py + ph - 3, 6, 3);
+                ctx.fillRect(px + pw - 8, py + ph - 3, 6, 3);
 
-            // Dress with ruffles
-            let dressGradient = ctx.createLinearGradient(px, py, px, py + ph);
-            dressGradient.addColorStop(0, '#ff9999');
-            dressGradient.addColorStop(1, '#ff6666');
-            ctx.fillStyle = dressGradient;
-            ctx.beginPath();
-            ctx.moveTo(px, py + 10);
-            ctx.lineTo(px + pw / 2, py);
-            ctx.lineTo(px + pw, py + 10);
-            ctx.lineTo(px + pw + 5, py + ph - 5);
-            ctx.lineTo(px - 5, py + ph - 5);
-            ctx.fill();
-            ctx.closePath();
-            ctx.fillStyle = '#ffcccc';
-            ctx.beginPath();
-            ctx.arc(px + pw / 2, py + ph - 5, 5, 0, Math.PI); // Ruffle
-            ctx.fill();
-            ctx.closePath();
+                // Dress with ruffles
+                let dressGradient = ctx.createLinearGradient(px, py, px, py + ph);
+                dressGradient.addColorStop(0, '#ff9999');
+                dressGradient.addColorStop(1, '#ff6666');
+                ctx.fillStyle = dressGradient;
+                ctx.beginPath();
+                ctx.moveTo(px, py + 10);
+                ctx.lineTo(px + pw / 2, py);
+                ctx.lineTo(px + pw, py + 10);
+                ctx.lineTo(px + pw + 5, py + ph - 5);
+                ctx.lineTo(px - 5, py + ph - 5);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#ffcccc';
+                ctx.beginPath();
+                ctx.arc(px + pw / 2, py + ph - 5, 5, 0, Math.PI); // Ruffle
+                ctx.fill();
+                ctx.closePath();
 
-            // Stomach (grows)
-            let stomachGradient = ctx.createRadialGradient(px + pw / 2, py + ph / 2, 5, px + pw / 2, py + ph / 2, 10 * player.stomachSize);
-            stomachGradient.addColorStop(0, '#ffcccc');
-            stomachGradient.addColorStop(1, '#ff9999');
-            ctx.fillStyle = stomachGradient;
-            ctx.beginPath();
-            ctx.arc(px + pw / 2, py + ph / 2, 10 * player.stomachSize, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.closePath();
+                // Stomach (grows, wobbles at end)
+                let stomachWobble = player.stomachSize * (1 + (score >= 250 && !gameOver ? Math.sin(Date.now() * 0.01) * 0.1 : 0));
+                let stomachGradient = ctx.createRadialGradient(px + pw / 2, py + ph / 2, 5, px + pw / 2, py + ph / 2, 10 * stomachWobble);
+                stomachGradient.addColorStop(0, '#ffcccc');
+                stomachGradient.addColorStop(1, '#ff9999');
+                ctx.fillStyle = stomachGradient;
+                ctx.beginPath();
+                ctx.arc(px + pw / 2, py + ph / 2, 10 * stomachWobble, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
 
-            // Arms with hands
-            ctx.fillStyle = '#ffe4c4';
-            ctx.beginPath();
-            ctx.moveTo(px - 5, py + 10);
-            ctx.lineTo(px - 10, py + 20);
-            ctx.lineTo(px - 5, py + 25);
-            ctx.lineTo(px, py + 15);
-            ctx.fill();
-            ctx.closePath();
-            ctx.beginPath();
-            ctx.moveTo(px + pw, py + 15);
-            ctx.lineTo(px + pw + 5, py + 25);
-            ctx.lineTo(px + pw + 10, py + 20);
-            ctx.lineTo(px + pw + 5, py + 10);
-            ctx.fill();
-            ctx.closePath();
+                // Arms with hands
+                ctx.fillStyle = '#ffe4c4';
+                ctx.beginPath();
+                ctx.moveTo(px - 5, py + 10);
+                ctx.lineTo(px - 10, py + 20);
+                ctx.lineTo(px - 5, py + 25);
+                ctx.lineTo(px, py + 15);
+                ctx.fill();
+                ctx.closePath();
+                ctx.beginPath();
+                ctx.moveTo(px + pw, py + 15);
+                ctx.lineTo(px + pw + 5, py + 25);
+                ctx.lineTo(px + pw + 10, py + 20);
+                ctx.lineTo(px + pw + 5, py + 10);
+                ctx.fill();
+                ctx.closePath();
 
-            // Head with details
-            ctx.fillStyle = '#ffe4c4';
-            ctx.beginPath();
-            ctx.arc(px + pw / 2, py - 5, 10, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.closePath();
-            ctx.fillStyle = '#ff9999';
-            ctx.beginPath();
-            ctx.arc(px + pw / 2 - 3, py - 5, 2, 0, Math.PI * 2);
-            ctx.arc(px + pw / 2 + 3, py - 5, 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.closePath();
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(px + pw / 2 - 3, py - 8, 1, 0, Math.PI * 2);
-            ctx.arc(px + pw / 2 + 3, py - 8, 1, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.closePath();
+                // Head with details
+                ctx.fillStyle = '#ffe4c4';
+                ctx.beginPath();
+                ctx.arc(px + pw / 2, py - 5, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#ff9999';
+                ctx.beginPath();
+                ctx.arc(px + pw / 2 - 3, py - 5, 2, 0, Math.PI * 2);
+                ctx.arc(px + pw / 2 + 3, py - 5, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(px + pw / 2 - 3, py - 8, 1, 0, Math.PI * 2);
+                ctx.arc(px + pw / 2 + 3, py - 8, 1, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
 
-            // Hair with strands
-            ctx.fillStyle = '#d2b48c';
-            ctx.beginPath();
-            ctx.moveTo(px - 5, py - 15);
-            ctx.quadraticCurveTo(px + pw / 2, py - 20, px + pw + 5, py - 15);
-            ctx.lineTo(px + pw + 10, py + 5);
-            ctx.lineTo(px - 10, py + 5);
-            ctx.fill();
-            ctx.closePath();
-            ctx.fillStyle = '#b89b72';
-            ctx.fillRect(px + 2, py - 15, pw - 4, 2);
+                // Hair with strands
+                ctx.fillStyle = '#d2b48c';
+                ctx.beginPath();
+                ctx.moveTo(px - 5, py - 15);
+                ctx.quadraticCurveTo(px + pw / 2, py - 20, px + pw + 5, py - 15);
+                ctx.lineTo(px + pw + 10, py + 5);
+                ctx.lineTo(px - 10, py + 5);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#b89b72';
+                ctx.fillRect(px + 2, py - 15, pw - 4, 2);
+            } else {
+                // Rolling fat body (circular, wobbling)
+                px = player.rollX;
+                py = player.rollY;
+                let rollSize = player.stomachSize * 20; // Larger, round body
+                let rollWobble = Math.sin(Date.now() * 0.05) * 5; // Wobble for humor
+
+                ctx.fillStyle = '#ff9999';
+                ctx.beginPath();
+                ctx.ellipse(px, py, rollSize, rollSize + rollWobble, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+
+                // Legs (sticking out, flailing)
+                ctx.fillStyle = '#ffe4c4';
+                ctx.beginPath();
+                ctx.arc(px - rollSize / 2, py + rollSize / 2, 4, 0, Math.PI * 2); // Left leg
+                ctx.arc(px + rollSize / 2, py + rollSize / 2, 4, 0, Math.PI * 2); // Right leg
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#ff6666';
+                ctx.fillRect(px - rollSize / 2 - 2, py + rollSize / 2 - 1, 4, 2); // Shoes
+                ctx.fillRect(px + rollSize / 2 - 2, py + rollSize / 2 - 1, 4, 2);
+
+                // Head (tiny, on top)
+                ctx.fillStyle = '#ffe4c4';
+                ctx.beginPath();
+                ctx.arc(px, py - rollSize, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = '#ff9999';
+                ctx.beginPath();
+                ctx.arc(px - 2, py - rollSize, 2, 0, Math.PI * 2); // Eyes
+                ctx.arc(px + 2, py - rollSize, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(px - 2, py - rollSize - 2, 1, 0, Math.PI * 2); // Pupils
+                ctx.arc(px + 2, py - rollSize - 2, 1, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            // Burp bubble (if triggered)
+            if (burpFrame > 0) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.beginPath();
+                ctx.arc(px + pw / 2, py - 20 - (10 - burpFrame), 10 - burpFrame / 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = 'black';
+                ctx.font = '12px Arial';
+                ctx.fillText('Burp!', px + pw / 2 - 10, py - 25 - (10 - burpFrame));
+                burpFrame -= 0.5;
+                if (burpFrame <= 0) burpFrame = 0;
+            }
         }
 
         function drawCupcakes() {
@@ -180,6 +243,9 @@
                     score += 10;
                     player.stomachSize += 0.2;
                     cupcakes = cupcakes.filter(cake => cake !== c);
+                    if (Math.random() < 0.3) { // 30% chance to burp
+                        burpFrame = 20; // Burp lasts 20 frames (1 second at 60 FPS)
+                    }
                     console.log('Player ate cupcake! Score:', score);
                 }
             });
@@ -188,9 +254,6 @@
         function drawLabradoodle() {
             if (score < 250) return;
             gameOver = true;
-            ctx.fillStyle = 'black';
-            ctx.font = '20px Arial';
-            ctx.fillText('Matthew, I don\'t feel good :(', 20, 240);
 
             if (cupcakes.length > 0) {
                 if (!labradoodle.targetCupcake || !cupcakes.includes(labradoodle.targetCupcake)) {
@@ -211,8 +274,21 @@
                     labradoodle.targetCupcake = null;
                     console.log('Labradoodle ate cupcake! Remaining:', cupcakes.length);
                 }
-            } else if (labradoodle.x < canvas.width) {
-                labradoodle.x += labradoodle.speed;
+            } else if (!labradoodle.exited) {
+                if (labradoodle.x < canvas.width && !labradoodle.pooping) {
+                    labradoodle.x += labradoodle.speed;
+                } else if (!labradoodle.pooping) {
+                    labradoodle.pooping = true;
+                    labradoodle.poopFrame = 0;
+                    console.log('Labradoodle pooping!');
+                } else {
+                    labradoodle.poopFrame += 0.1;
+                    if (labradoodle.poopFrame > 1) {
+                        labradoodle.pooping = false;
+                        labradoodle.exited = true;
+                        console.log('Labradoodle exited!');
+                    }
+                }
             }
 
             // Enhanced Labradoodle graphics
@@ -266,6 +342,17 @@
             ctx.arc(lx + labradoodle.width + 2, ly + 12, 2, 0, Math.PI * 2);
             ctx.fill();
             ctx.closePath();
+
+            // Poop (if triggered)
+            if (labradoodle.pooping) {
+                let poopX = lx + labradoodle.width + 5;
+                let poopY = ly + labradoodle.height - 5;
+                ctx.fillStyle = '#8b4513';
+                ctx.beginPath();
+                ctx.ellipse(poopX, poopY + Math.sin(labradoodle.poopFrame * Math.PI) * 5, 5, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+            }
         }
 
         function draw() {
@@ -276,14 +363,50 @@
             ctx.fillStyle = 'black';
             ctx.font = '16px Arial';
             ctx.fillText(`Score: ${score}`, 10, 20);
+
+            if (gameOver && score >= 250) {
+                ctx.fillStyle = 'red';
+                ctx.font = 'bold 24px Comic Sans MS';
+                ctx.textAlign = 'center';
+                ctx.fillText('Matthew, I don\'t feel good', canvas.width / 2, canvas.height / 2);
+            }
         }
 
         function update() {
-            if (!gameOver || score >= 250) {
+            if (score >= 250 && !gameOver) {
+                gameOver = true;
+                player.rolling = true;
+                player.rollX = player.x;
+                player.rollY = player.y;
+                player.rollVel = -5; // Start rolling upward
+                console.log('Player rolling started!');
+            }
+
+            if (player.rolling) {
+                player.rollX += 3; // Roll right
+                player.rollY += player.rollVel;
+                player.rollVel += 0.3; // Gravity
+                if (player.rollY > 400) {
+                    player.rollY = 400;
+                    player.rollVel = -player.rollVel * 0.7; // Bounce
+                }
+                if (player.rollX > canvas.width + player.stomachSize * 20) {
+                    player.rolling = false; // Stop when off-screen
+                    console.log('Player rolled off-screen!');
+                }
+            } else if (!gameOver) {
                 draw();
-                if (!gameOver && Math.random() < 0.05) spawnCupcake();
+                if (Math.random() < 0.05) spawnCupcake();
                 cupcakes = cupcakes.filter(c => c.y < canvas.height);
                 requestAnimationFrame(update);
+            } else {
+                draw();
+                if (labradoodle.x >= canvas.width && !labradoodle.pooping && !labradoodle.exited) {
+                    labradoodle.pooping = true;
+                    labradoodle.poopFrame = 0;
+                    console.log('Labradoodle pooping!');
+                }
+                requestAnimationFrame(update); // Keep drawing rolling, Labradoodle, and poop
             }
         }
 
